@@ -76,6 +76,7 @@ void PngSnapshotStreamer::sendImage(const cv::Mat &img, const ros::Time &time)
 
   std::vector<uchar> encoded_buffer;
   cv::imencode(".png", img, encoded_buffer, encode_params);
+  
 
   char stamp[20];
   sprintf(stamp, "%.06lf", time.toSec());
@@ -96,4 +97,9 @@ void PngSnapshotStreamer::sendImage(const cv::Mat &img, const ros::Time &time)
   inactive_ = true;
 }
 
+boost::shared_ptr<ImageStreamer> PngSnapshotType::create_snapshot(const async_web_server_cpp::HttpRequest &request,
+                                         async_web_server_cpp::HttpConnectionPtr connection,
+                                         ros::NodeHandle& nh){
+  return boost::shared_ptr<ImageStreamer>(new PngSnapshotStreamer(request, connection, nh));
+}
 }

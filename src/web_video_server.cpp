@@ -54,7 +54,7 @@ WebVideoServer::WebVideoServer(ros::NodeHandle &nh, ros::NodeHandle &private_nh)
 #endif
 
   private_nh.param("port", port_, 8080);
-  private_nh.param("verbose", __verbose, true);
+  private_nh.param("verbose", __verbose, false);
 
   private_nh.param<std::string>("address", address_, "0.0.0.0");
 
@@ -72,6 +72,11 @@ WebVideoServer::WebVideoServer(ros::NodeHandle &nh, ros::NodeHandle &private_nh)
   stream_types_["vp8"] = boost::shared_ptr<ImageStreamerType>(new Vp8StreamerType());
   stream_types_["h264"] = boost::shared_ptr<ImageStreamerType>(new H264StreamerType());
   stream_types_["vp9"] = boost::shared_ptr<ImageStreamerType>(new Vp9StreamerType());
+
+  // follow same code structure for snapshot_types
+  snapshot_types_["mjpeg"] = boost::shared_ptr<ImageSnapshotType>(new JpegSnapshotType());
+  snapshot_types_["png"] = boost::shared_ptr<ImageSnapshotType>(new PngSnapshotType());
+  //snapshot_types_["tiff"] = boost::shared_ptr<ImageSnapshotType>(new TiffSnapshotType());
 
   handler_group_.addHandlerForPath("/", boost::bind(&WebVideoServer::handle_list_streams, this, _1, _2, _3, _4));
   handler_group_.addHandlerForPath("/stream", boost::bind(&WebVideoServer::handle_stream, this, _1, _2, _3, _4));
@@ -196,7 +201,12 @@ bool WebVideoServer::handle_snapshot(const async_web_server_cpp::HttpRequest &re
                                      async_web_server_cpp::HttpConnectionPtr connection, const char* begin,
                                      const char* end)
 {
-  boost::shared_ptr<ImageStreamer> streamer(new JpegSnapshotStreamer(request, connection, nh_));
+  std::string type = request.get_query_param_value_or_default("type", __default_stream_type);
+  if (snapshot_types_.find(type) == snapshot_types_.end()){
+    ROS_INFO_STREAM("Could not find " << type << " snapshot streamer, falling back to jpeg");
+    type = "mjpeg";
+  }
+  boost::shared_ptr<ImageStreamer> streamer = snapshot_types_[type]->create_snapshot(request, connection, nh_);
   streamer->start();
 
   boost::mutex::scoped_lock lock(subscriber_mutex_);
@@ -346,8 +356,10 @@ bool WebVideoServer::handle_list_streams(const async_web_server_cpp::HttpRequest
 
 int main(int argc, char **argv)
 {
-  ros::init(argc, argv, "web_video_server");
-
+  ros::init(argc, argv, "web_video_server_png");
+  ROS_INFO("*************************");
+  ROS_INFO("WEB VIDEO SERVER PNG MODE");
+  ROS_INFO("*************************");
   ros::NodeHandle nh;
   ros::NodeHandle private_nh("~");
 
